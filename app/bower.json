@@ -1,0 +1,24 @@
+{
+  "name": "app",
+  "homepage": "https://github.com/mangopop/angular-auth-jwt",
+  "authors": [
+    "simon.norton <simon@nitritex.com>"
+  ],
+  "description": "",
+  "main": "",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular-resource": "~1.5.0",
+    "foundation": "~5.4.7",
+    "angular-jwt": "^0.0.9",
+    "angular-route": "~1.5.0",
+    "jquery": "~2.1.1"
+  }
+}
