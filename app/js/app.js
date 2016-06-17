@@ -10,7 +10,6 @@ app.config(['$routeProvider','$locationProvider','$httpProvider','jwtInterceptor
         redirectTo: '/'
     });
 
-
     //$httpProvider.defaults.headers.common = {};
     //$httpProvider.defaults.headers.post = {};
     //$httpProvider.defaults.headers.get = {};
@@ -24,24 +23,25 @@ app.config(['$routeProvider','$locationProvider','$httpProvider','jwtInterceptor
     //that would prevent CORS from working
     delete $httpProvider.defaults.headers.common['X-Requested-With'];
 
-
     //jwtInterceptorProvider.tokenGetter = ['myService', function(myService) {
     //    myService.doSomething();
     //    return localStorage.getItem('id_token');
     //}];
-    //jwtInterceptorProvider.tokenGetter = function() {
+
+    //this does work, check config.header object
+    // jwtInterceptorProvider.tokenGetter = function() {
     //
-    //    if(!localStorage.getItem('id_token') ){
-    //        return 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImp0aSI6IjRmMWcyM2ExMmFhIn0.eyJpc3MiOiJodHRwOlwvXC9hcGkuZGV2Lm5pdHJpdGV4LmNvbSIsImF1ZCI6Imh0dHA6XC9cL2FwaS5kZXYubml0cml0ZXguY29tIiwianRpIjoiNGYxZzIzYTEyYWEiLCJpYXQiOjE0NTUyMDM0MzksIm5iZiI6MTQ1NTIwMzQ5OSwiZXhwIjoxNDU1MjA3MDM5LCJ1aWQiOjF9.iJm7T75MMAjLF3UuIJM1_XAmMIkSFUOjytU7sTUGhEw'
-    //    }else{
-    //        //console.log('tokenGetter '+localStorage.getItem('id_token'));
+    //     if(!localStorage.getItem('id_token') ){
+    //         return null
+    //     }else{
+    //         console.log('tokenGetter '+localStorage.getItem('id_token'));
     //
-    //        return localStorage.getItem('id_token');
-    //    }
+    //         return localStorage.getItem('id_token');
+    //     }
     //
-    //};
+    // };
     //jwtInterceptorProvider.tokenGetter = ['store', function (store) { return store.get('jwt'); }];
-    //$httpProvider.interceptors.push('jwtInterceptor');
+    // $httpProvider.interceptors.push('jwtInterceptor');
     //$httpProvider.interceptors.push('httpRequestInterceptor');
 
     ///// *** remove the hashbang *** //////
@@ -50,6 +50,7 @@ app.config(['$routeProvider','$locationProvider','$httpProvider','jwtInterceptor
 
 }]).run(function($http) {
     if(localStorage.getItem('id_token')){
+        $http.defaults.headers.common.Authorization = 'Bearer '+localStorage.getItem('id_token');//this will set header which is logged out in http get call
         $http.defaults.headers.common.Authorization = 'Bearer '+localStorage.getItem('id_token');//this will set header which is logged out in http get call
     }else{
 
@@ -69,6 +70,14 @@ app.config(['$routeProvider','$locationProvider','$httpProvider','jwtInterceptor
 //            }
 //        };
 //    }]);
+
+/*
+ OK so further knowledge gained on this, setting custom headers with JS kicks of a preflight request using `OPTIONS` JQuery explicitly avoids setting customer headers to avoid this problem,
+ it seem that angular doesn't . So it's something that has to be dealt with, if you are setting your own headers or not.
+ What you have to do is accept `options` in your backend (I'm using silex) then return a response saying 'ok fine if you must insist with this circus act'
+ and then angular will make another request with `POST ` with the correct header and everyone can go home and relax. So it's working all nice and secure with JSON web token keys signed and validated by date in auth header.
+ effort.
+ */
 
 app.controller('HomeCtrl',['$scope','$routeParams','$location', '$http', function($scope,$routeParams,$location,$http) { //picky order
     //var vm = this;
@@ -97,27 +106,21 @@ app.controller('HomeCtrl',['$scope','$routeParams','$location', '$http', functio
     $scope.getSecureStuff = function(){
 
         $http({
-            method: 'JSONP',
-            url: 'http://dev.api.nitritex.com/secure',
-            params: {callback:'JSON_CALLBACK'},
+            method: 'GET', //switched this FROM JSONP to GET and saw the Auth header, and got the Auth working on the other end (but hasn't tested if I can get content out)
+            url: 'http://dev.api.nitritex.com/secure'
+            // params: {callback:'JSON_CALLBACK'}
 
         }).then(
             function(response){
                 console.log('success '+response.data);
                 //console.dir(data);
             },
-            function(response,status ){
-                console.log('fail'+status);
+            function(response){
+                console.log('fail');
                 console.log(response);
+                //this isn't getting to silex, can be JSONP (doesn't allow setting headers) or the OPTIONS pre-flight situation
+                console.log('custom auth header ' +$http.defaults.headers.common.Authorization); //using interceptor this isn't set
             });
-
-        //$http.get('http://dev.api.nitritex.com/shop/products').then(
-        //    function(data){
-        //        console.log('success'+data);
-        //    },
-        //    function(data){
-        //        console.log('fail');
-        //    });
     };
 
     $scope.jax = function() {
@@ -140,7 +143,7 @@ app.controller('HomeCtrl',['$scope','$routeParams','$location', '$http', functio
         $http({
             method: 'GET',
             url: 'http://dev.api.nitritex.com/unsecure',
-            //params: {callback:'JSON_CALLBACK'},
+            params: {callback:'JSON_CALLBACK'},
             header: {
                 'X-SIMON-WOZ-ERE`': 'test'
             }
@@ -150,18 +153,9 @@ app.controller('HomeCtrl',['$scope','$routeParams','$location', '$http', functio
                 console.log('success '+response.data);
                 //console.dir(data);
             },
-            function(response,status ){
+            function(){
                 console.log('fail');
-                //console.log(response
             });
-
-        //$http.get('http://dev.api.nitritex.com/shop/products').then(
-        //    function(data){
-        //        console.log('success'+data);
-        //    },
-        //    function(data){
-        //        console.log('fail');
-        //    });
     };
 
     $scope.postStuff = function(){
@@ -170,7 +164,7 @@ app.controller('HomeCtrl',['$scope','$routeParams','$location', '$http', functio
             method: 'POST',
             url: 'http://dev.api.nitritex.com/posting',
             //url: 'http://dev.bioclean.com/service/products.php',
-            params: {user:'1',pass:'mypass'}
+            params: {user:'simon',pass:'pass'}
         }).then(
             function(data){
                 console.log('success');
@@ -180,40 +174,5 @@ app.controller('HomeCtrl',['$scope','$routeParams','$location', '$http', functio
                 console.log('fail ' );
                 console.log(data);
             });
-
-        //$http.get('http://dev.api.nitritex.com/shop/products').then(
-        //    function(data){
-        //        console.log('success'+data);
-        //    },
-        //    function(data){
-        //        console.log('fail');
-        //    });
     };
-
-    //var authData = 'Basic '+ $window.btoa(unescape(encodeURIComponent(param))).encode('simon') + ':' + base64Service.encode('pa55word');
-    //console.log(authData);
-
-    //$scope.testGenerateAuthorizationHeader = function() {
-    //    console.log(basicAuthService.generateAuthorizationHeader('simon', 'pa55word')); // return 'Basic am9obg==:dGhpcyBpcyBteSBwYXNzd29yZA=='
-    //};
-
-    //$scope.testLogin = function() {
-    //    var authData = {username: 'simon', password: 'password'};
-    //
-    //    var successCB = function(response) {
-    //        console.log(response);
-    //        // Work with extra data coming from the remote server
-    //        //$scope.generatedKey = response.data.generatedKey; //there is nothing coming back, so use root response
-    //        $scope.generatedKey = response;
-    //    };
-    //
-    //    var failureCB = function(error) {
-    //        $scope.status = 'ERROR';
-    //    };
-    //
-    //    basicAuthService.login('http://dev.api.nitritex.com/loginfree', authData, successCB, failureCB);
-    //};
-
-
-
 }]);
